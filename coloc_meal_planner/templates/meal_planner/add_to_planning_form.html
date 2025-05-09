@@ -1,0 +1,53 @@
+{% extends 'meal_planner/base.html' %}
+
+{% block title %}Ajouter {{ recipe.name }} au planning{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h2><i class="fas fa-calendar-plus"></i> Ajouter {{ recipe.name }} au planning</h2>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="date" class="form-label">Date</label>
+                            <input type="date" class="form-control" id="date" name="date" 
+                                   value="{{ today|date:'Y-m-d' }}" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="meal_type" class="form-label">Type de repas</label>
+                            <select class="form-select" id="meal_type" name="meal_type" required>
+                                <option value="">Choisir un type de repas...</option>
+                                {% for meal_type, meal_name in meal_types %}
+                                <option value="{{ meal_type }}">{{ meal_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="servings" class="form-label">Nombre de portions</label>
+                            <input type="number" class="form-control" id="servings" name="servings" 
+                                   value="{{ recipe.servings }}" min="1" required>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Ajouter au planning
+                            </button>
+                            <a href="{% url 'meal_planner:recipe_detail' recipe.id %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Retour à la recette
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

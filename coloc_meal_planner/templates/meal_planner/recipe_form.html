@@ -1,0 +1,139 @@
+<!-- templates/meal_planner/recipe_form.html -->
+{% extends 'meal_planner/base.html' %}
+
+{% block extra_css %}
+{{ form.media.css }}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% if form.instance.pk %}Modifier{% else %}Créer{% endif %} une recette</h2>
+    
+    <form method="post" class="mt-4">
+        {% csrf_token %}
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h3 class="card-title">Informations de la recette</h3>
+                {% for field in form %}
+                <div class="mb-3">
+                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                    <div class="alert alert-danger">
+                        {{ field.errors }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h3 class="card-title">Ingrédients</h3>
+                {{ ingredients_formset.management_form }}
+                <div id="ingredients-formset">
+                    {% for form in ingredients_formset %}
+                    <div class="ingredient-form mb-3 p-3 border rounded">
+                        <div class="row">
+                            <div class="col-md-5">
+                                <div class="mb-2">
+                                    <label class="form-label">Ingrédient</label>
+                                    {{ form.ingredient}}
+                                    {% comment %} {{ form.id }} {% endcomment %}
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-2">
+                                    <label class="form-label">Quantité</label>
+                                    {{ form.quantity }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-2">
+                                    <label class="form-label">Unité</label>
+                                    {{ form.unit }}
+                                </div>
+                            </div>
+                        </div>
+                        {% if form.instance.pk %}
+                        <div class="form-check mt-2">
+                            {{ form.DELETE }}
+                            <label class="form-check-label" for="{{ form.DELETE.id_for_label }}">
+                                Supprimer cet ingrédient
+                            </label>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="button" class="btn btn-secondary" id="add-ingredient">
+                    Ajouter un ingrédient
+                </button>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="{% url 'meal_planner:recipes' %}" class="btn btn-secondary">Annuler</a>
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+    </form>
+</div>
+
+{% block extra_js %}
+{{ form.media.js }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const addButton = document.getElementById('add-ingredient');
+    const totalForms = document.getElementById('id_ingredients-TOTAL_FORMS');
+    const formsetContainer = document.getElementById('ingredients-formset');
+    const emptyForm = document.querySelector('.ingredient-form').cloneNode(true);
+    
+    // Fonction pour créer un nouveau formulaire
+    function createNewForm() {
+        const formCount = parseInt(totalForms.value);
+        const newForm = emptyForm.cloneNode(true);
+        
+        // Mettre à jour les IDs et names des champs
+        newForm.querySelectorAll('input, select').forEach(input => {
+            const name = input.getAttribute('name');
+            if (name) {
+                input.setAttribute('name', name.replace('-0-', `-${formCount}-`));
+                input.setAttribute('id', input.getAttribute('id').replace('-0-', `-${formCount}-`));
+                input.value = '';
+            }
+        });
+        
+        // Supprimer la case à cocher DELETE si elle existe
+        const deleteCheckbox = newForm.querySelector('input[type="checkbox"]');
+        if (deleteCheckbox) {
+            deleteCheckbox.parentElement.remove();
+        }
+        
+        formsetContainer.appendChild(newForm);
+        totalForms.value = formCount + 1;
+        
+        // Réinitialiser Select2 sur le nouveau formulaire
+        const select = newForm.querySelector('select');
+        if (select) {
+            $(select).select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                tags: true,
+                placeholder: 'Rechercher ou créer un ingrédient...'
+            });
+        }
+    }
+    
+    // Gestion de l'ajout de nouveaux formulaires
+    addButton.addEventListener('click', createNewForm);
+    
+    // Si aucun ingrédient n'est présent, en ajouter un par défaut
+    if (document.querySelectorAll('.ingredient-form').length === 0) {
+        createNewForm();
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}

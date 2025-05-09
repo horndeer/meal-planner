@@ -1,0 +1,229 @@
+<!-- templates/meal_planner/recipes.html (amélioré) -->
+{% extends 'meal_planner/base.html' %}
+
+{% block title %}Recettes | {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-6">
+        <h1>Recettes</h1>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <div class="btn-group mb-2 me-2" role="group">
+            <a href="{% url 'meal_planner:recipe_create' %}" class="btn btn-success">
+                <i class="bi bi-plus-circle"></i> Ajouter une recette
+            </a>
+            <a href="{% url 'meal_planner:import_marmiton' %}" class="btn btn-info">
+                <i class="bi bi-cloud-download"></i> Importer depuis Marmiton
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-4">
+                        <input type="text" name="search" class="form-control" placeholder="Rechercher une recette..." value="{{ request.GET.search|default:'' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <select name="category" class="form-select">
+                            <option value="">Toutes catégories</option>
+                            {% for cat in categories %}
+                                <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:"i" %}selected{% endif %}>{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select name="difficulty" class="form-select">
+                            <option value="">Toutes difficultés</option>
+                            <option value="1" {% if request.GET.difficulty == "1" %}selected{% endif %}>Facile</option>
+                            <option value="2" {% if request.GET.difficulty == "2" %}selected{% endif %}>Moyen</option>
+                            <option value="3" {% if request.GET.difficulty == "3" %}selected{% endif %}>Difficile</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">Filtrer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <ul class="nav nav-tabs" id="recipeTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab">
+                    Toutes ({{ recipes|length }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="favorites-tab" data-bs-toggle="tab" data-bs-target="#favorites" type="button" role="tab">
+                    <i class="bi bi-star-fill"></i> Favorites ({{ favorite_recipes|default:"0" }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="coloc-tab" data-bs-toggle="tab" data-bs-target="#coloc" type="button" role="tab">
+                    <i class="bi bi-people-fill"></i> Recettes coloc ({{ coloc_recipes|default:"0" }})
+                </button>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div class="tab-content" id="recipeTabsContent">
+    <div class="tab-pane fade show active" id="all" role="tabpanel">
+        <div class="row">
+            {% for recipe in recipes %}
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    {% if recipe.image %}
+                    <img src="{{ recipe.image.url }}" class="card-img-top" alt="{{ recipe.name }}">
+                    {% else %}
+                    <div class="card-img-top bg-light text-center py-5">
+                        <i class="bi bi-card-image text-muted" style="font-size: 3rem;"></i>
+                    </div>
+                    {% endif %}
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title mb-0">{{ recipe.name }}</h5>
+                            <div class="favorite-toggle" data-recipe-id="{{ recipe.id }}">
+                                <i class="bi {% if recipe.id in user_favorites %}bi-star-fill{% else %}bi-star{% endif %} favorite-star"></i>
+                            </div>
+                        </div>
+                        
+                        <p class="card-text">{{ recipe.description|truncatechars:100 }}</p>
+                        
+                        <div class="d-flex justify-content-between mb-2">
+                            <small class="text-muted">
+                                {% if recipe.preparation_time or recipe.cooking_time %}
+                                    <i class="bi bi-clock"></i> 
+                                    {% if recipe.preparation_time %}Prép: {{ recipe.preparation_time }} min{% endif %}
+                                    {% if recipe.preparation_time and recipe.cooking_time %} | {% endif %}
+                                    {% if recipe.cooking_time %}Cuisson: {{ recipe.cooking_time }} min{% endif %}
+                                {% endif %}
+                            </small>
+                            <small class="text-muted">
+                                <i class="bi bi-people"></i> {{ recipe.servings }} pers.
+                            </small>
+                        </div>
+                        
+                        <div class="mb-2">
+                            {% if recipe.is_coloc_favorite %}
+                                <span class="badge coloc-badge">
+                                    <i class="bi bi-people-fill"></i> Favorite coloc
+                                </span>
+                            {% endif %}
+                            
+                            {% for tag in recipe.tags.all|slice:":3" %}
+                                <span class="badge bg-light text-dark recipe-tag">{{ tag.name }}</span>
+                            {% endfor %}
+                            
+                            {% if recipe.difficulty %}
+                                <span class="badge {% if recipe.difficulty == 1 %}bg-success{% elif recipe.difficulty == 2 %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ recipe.get_difficulty_display }}
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent d-flex justify-content-between">
+                        <div>
+                            <a href="{% url 'meal_planner:recipe_detail' pk=recipe.pk %}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> Voir
+                            </a>
+                            <a href="{% url 'meal_planner:recipe_update' pk=recipe.pk %}" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-pencil"></i> Modifier
+                            </a>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-calendar-plus"></i> Planifier
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'meal_planner:add_to_planning' recipe_id=recipe.id day='today' %}">Aujourd'hui</a></li>
+                                <li><a class="dropdown-item" href="{% url 'meal_planner:add_to_planning' recipe_id=recipe.id day='tomorrow' %}">Demain</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'meal_planner:add_to_planning_form' recipe_id=recipe.id %}">Choisir une date...</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    Aucune recette disponible. <a href="{% url 'meal_planner:recipe_create' %}">Ajoutez-en une</a> ou <a href="{% url 'meal_planner:import_marmiton' %}">importez depuis Marmiton</a> !
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="tab-pane fade" id="favorites" role="tabpanel">
+        <div class="row">
+            <!-- Contenu similaire à celui de l'onglet "all" mais filtré sur les recettes favorites -->
+            {% for recipe in favorite_recipes %}
+            <!-- Répétez le même modèle de carte que ci-dessus -->
+            {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    Vous n'avez pas encore de recettes favorites. Cliquez sur l'étoile pour en ajouter !
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="tab-pane fade" id="coloc" role="tabpanel">
+        <div class="row">
+            <!-- Contenu similaire mais filtré sur les recettes de la coloc -->
+            {% for recipe in coloc_recipes %}
+            <!-- Répétez le même modèle de carte que ci-dessus -->
+            {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    Aucune recette n'a encore été marquée comme favorite par la coloc. Proposez-en une !
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Script pour gérer les favoris
+    document.querySelectorAll('.favorite-toggle').forEach(function(el) {
+        el.addEventListener('click', function() {
+            const recipeId = this.dataset.recipeId;
+            const icon = this.querySelector('i');
+            
+            fetch(`{% url 'meal_planner:toggle_favorite' %}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    recipe_id: recipeId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'added') {
+                    icon.classList.remove('bi-star');
+                    icon.classList.add('bi-star-fill');
+                } else {
+                    icon.classList.remove('bi-star-fill');
+                    icon.classList.add('bi-star');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

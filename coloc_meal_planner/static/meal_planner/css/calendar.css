@@ -1,0 +1,127 @@
+
+/* .calendar {
+    width: 100%;
+    margin-bottom: 20px;
+    border-collapse: collapse;
+}
+
+.calendar th {
+    background-color: #f8f9fa;
+    text-align: center;
+    padding: 10px;
+}
+
+.calendar td {
+    width: 14.28%;
+    height: 120px;
+    padding: 5px;
+    vertical-align: top;
+    border: 1px solid #dee2e6;
+}
+
+.calendar .date {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.calendar .noday {
+    background-color: #f8f9fa;
+}
+
+.meal {
+    margin-bottom: 3px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 0.8em;
+}
+
+.meal.breakfast {
+    background-color: #ffe0b2;
+}
+
+.meal.lunch {
+    background-color: #c8e6c9;
+}
+
+.meal.dinner {
+    background-color: #bbdefb;
+} */
+
+
+.calendar {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+.calendar th {
+    padding: 10px;
+    text-align: center;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    width: 14.28%; /* 100% / 7 days */
+}
+
+.calendar td {
+    padding: 10px;
+    height: 120px;
+    vertical-align: top;
+    border: 1px solid #dee2e6;
+    width: 14.28%; /* 100% / 7 days */
+}
+
+.calendar td.day {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    position: relative;
+}
+
+.calendar td.day:hover {
+    background-color: #e9ecef;
+}
+
+.calendar td.noday {
+    background-color: #f8f9fa;
+}
+
+.calendar .date {
+    font-weight: bold;
+    margin-bottom: 5px;
+    display: block;
+    font-size: 1.1em;
+}
+
+.calendar .meal {
+    font-size: 0.9em;
+    margin-bottom: 3px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calendar .meal.breakfast {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.calendar .meal.lunch {
+    background-color: #28a745;
+    color: #fff;
+}
+
+.calendar .meal.dinner {
+    background-color: #17a2b8;
+    color: #fff;
+}
+
+/* Ensure the calendar table takes full width */
+.card-body {
+    padding: 0;
+}
+
+.card-body .calendar {
+    margin: 0;
+}  

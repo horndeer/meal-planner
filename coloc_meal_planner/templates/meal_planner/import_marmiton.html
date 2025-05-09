@@ -1,0 +1,106 @@
+{% extends 'meal_planner/base.html' %}
+
+{% block title %}Importer une recette de Marmiton{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h2><i class="fas fa-cloud-download-alt"></i> Importer une recette de Marmiton</h2>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label for="id_url" class="form-label">URL de la recette sur Marmiton</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-link"></i></span>
+                                <input type="url" class="form-control {% if form.url.errors %}is-invalid{% endif %}" 
+                                       id="id_url" name="url" value="{{ form.url.value|default:'' }}" 
+                                       placeholder="https://www.marmiton.org/recettes/..." required>
+                                {% if form.url.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.url.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="form-text">Collez l'URL complète de la page de la recette Marmiton.</div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-download"></i> Importer la recette
+                            </button>
+                            <a href="{% url 'meal_planner:recipes' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Retour aux recettes
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="import-container mt-4">
+                <h3>Comment ça marche</h3>
+                <ol class="import-steps">
+                    <li>Allez sur <a href="https://www.marmiton.org" target="_blank">Marmiton</a> et trouvez une recette qui vous intéresse</li>
+                    <li>Copiez l'URL complète de la page de la recette dans votre navigateur</li>
+                    <li>Collez cette URL dans le champ ci-dessus et cliquez sur "Importer la recette"</li>
+                    <li>Vérifiez les détails importés et complétez les informations manquantes si nécessaire</li>
+                    <li>La recette est maintenant disponible dans votre planificateur de repas !</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h3>Exemple d'importation</h3>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <i class="fas fa-utensils import-icon"></i>
+                    </div>
+                    <p>Notre importateur peut extraire automatiquement :</p>
+                    <ul>
+                        <li>Nom de la recette</li>
+                        <li>Description</li>
+                        <li>Temps de préparation et de cuisson</li>
+                        <li>Nombre de portions</li>
+                        <li>Liste des ingrédients avec quantités</li>
+                        <li>Instructions détaillées</li>
+                    </ul>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Certaines recettes peuvent nécessiter des ajustements manuels après l'importation.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-warning text-dark">
+                    <h3>Besoin d'aide ?</h3>
+                </div>
+                <div class="card-body">
+                    <p>Si l'importation échoue, essayez de :</p>
+                    <ul>
+                        <li>Vérifier que l'URL est valide et complète</li>
+                        <li>Vous assurer que la recette existe toujours sur Marmiton</li>
+                        <li>Essayer avec une autre recette</li>
+                    </ul>
+                    <p>Si le problème persiste, vous pouvez toujours <a href="{% url 'meal_planner:recipe_create' %}">créer la recette manuellement</a>.</p>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm mt-4">
+                <div class="card-body">
+                    <img src="/api/placeholder/400/320" alt="Import illustration" class="img-fluid rounded">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

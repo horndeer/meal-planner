@@ -1,0 +1,168 @@
+{% extends 'meal_planner/base.html' %}
+
+{% block title %}{{ recipe.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h2><i class="fas fa-utensils"></i> {{ recipe.name }}</h2>
+                    <div>
+                        <button class="btn btn-light btn-sm toggle-favorite" data-recipe-id="{{ recipe.id }}">
+                            <i class="fas {% if recipe.is_favorite %}fa-star{% else %}fa-star-o{% endif %}"></i>
+                        </button>
+                        <a href="{% url 'meal_planner:recipe_update' recipe.id %}" class="btn btn-light btn-sm">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if recipe.description %}
+                    <div class="mb-4">
+                        <h4>Description</h4>
+                        <p>{{ recipe.description }}</p>
+                    </div>
+                    {% endif %}
+
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-clock fa-2x mb-2"></i>
+                                    <h5>Temps de préparation</h5>
+                                    <p>{{ recipe.preparation_time }} min</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-fire fa-2x mb-2"></i>
+                                    <h5>Temps de cuisson</h5>
+                                    <p>{{ recipe.cooking_time }} min</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-users fa-2x mb-2"></i>
+                                    <h5>Portions</h5>
+                                    <p>{{ recipe.servings }} pers.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header bg-info text-white">
+                                    <h4><i class="fas fa-list"></i> Ingrédients</h4>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-group list-group-flush">
+                                        {% for ingredient in recipe.ingredients.all %}
+                                        <li class="list-group-item">
+                                            {{ ingredient.quantity }} {{ ingredient.unit }} {{ ingredient.ingredient.name }}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header bg-success text-white">
+                                    <h4><i class="fas fa-tasks"></i> Instructions</h4>
+                                </div>
+                                <div class="card-body">
+                                    {{ recipe.instructions|linebreaks }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if recipe.source_url %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-external-link-alt"></i> Source: 
+                        <a href="{{ recipe.source_url }}" target="_blank">{{ recipe.source_url }}</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-success text-white">
+                    <h4><i class="fas fa-calendar-plus"></i> Ajouter au planning</h4>
+                </div>
+                <div class="card-body">
+                    <div class="dropdown">
+                        <button class="btn btn-primary w-100 mb-2 dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            Ajouter rapidement
+                        </button>
+                        <ul class="dropdown-menu w-100">
+                            <li><a class="dropdown-item" href="{% url 'meal_planner:add_to_planning' recipe_id=recipe.id day='today' %}">Aujourd'hui</a></li>
+                            <li><a class="dropdown-item" href="{% url 'meal_planner:add_to_planning' recipe_id=recipe.id day='tomorrow' %}">Demain</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'meal_planner:add_to_planning_form' recipe_id=recipe.id %}">Choisir une date...</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h4><i class="fas fa-info-circle"></i> Informations</h4>
+                </div>
+                <div class="card-body">
+                    <p><strong>Créée par:</strong> {{ recipe.created_by.username }}</p>
+                    <p><strong>Date de création:</strong> {{ recipe.created_at|date:"d/m/Y" }}</p>
+                    {% if recipe.updated_at %}
+                    <p><strong>Dernière modification:</strong> {{ recipe.updated_at|date:"d/m/Y" }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestion du bouton favori
+    const favoriteBtn = document.querySelector('.toggle-favorite');
+    if (favoriteBtn) {
+        favoriteBtn.addEventListener('click', function() {
+            const recipeId = this.dataset.recipeId;
+            fetch('{% url "meal_planner:toggle_favorite" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: `recipe_id=${recipeId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const icon = this.querySelector('i');
+                    if (data.is_favorite) {
+                        icon.classList.remove('fa-star-o');
+                        icon.classList.add('fa-star');
+                    } else {
+                        icon.classList.remove('fa-star');
+                        icon.classList.add('fa-star-o');
+                    }
+                }
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
+{% endblock %} 

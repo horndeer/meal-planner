@@ -1,0 +1,69 @@
+<!-- templates/meal_planner/day_detail.html -->
+{% extends 'meal_planner/base.html' %}
+
+{% block title %}Repas du {{ date|date:"d/m/Y" }} | {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-6">
+        <h1>Repas du {{ date|date:"d/m/Y" }}</h1>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <div class="btn-group" role="group">
+            <a href="{% url 'meal_planner:day_detail' year=prev_day.year month=prev_day.month day=prev_day.day %}" class="btn btn-outline-primary">&laquo; Jour précédent</a>
+            <a href="{% url 'meal_planner:calendar' %}" class="btn btn-outline-secondary">Retour au calendrier</a>
+            <a href="{% url 'meal_planner:day_detail' year=next_day.year month=next_day.month day=next_day.day %}" class="btn btn-outline-primary">Jour suivant &raquo;</a>
+        </div>
+    </div>
+</div>
+
+{% for meal_type, meal_data in meal_forms.items %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h3>{{ meal_data.name }}</h3>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            {{ meal_data.form.non_field_errors }}
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="{{ meal_data.form.recipe.id_for_label }}" class="form-label">Recette</label>
+                    {{ meal_data.form.recipe }}
+                    {{ meal_data.form.recipe.errors }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ meal_data.form.servings.id_for_label }}" class="form-label">Nombre de personnes</label>
+                    {{ meal_data.form.servings }}
+                    {{ meal_data.form.servings.errors }}
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="{{ meal_data.form.cook.id_for_label }}" class="form-label">Qui cuisine ?</label>
+                    {{ meal_data.form.cook }}
+                    {{ meal_data.form.cook.errors }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ meal_data.form.cleaner.id_for_label }}" class="form-label">Qui fait la vaisselle ?</label>
+                    {{ meal_data.form.cleaner }}
+                    {{ meal_data.form.cleaner.errors }}
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-between">
+                <button type="submit" name="save_{{ meal_type }}" class="btn btn-primary">
+                    {% if meal_data.exists %}Modifier{% else %}Ajouter{% endif %}
+                </button>
+                
+                {% if meal_data.exists %}
+                <a href="#" class="btn btn-danger">Supprimer</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
