@@ -31,4 +31,5 @@ urlpatterns = [
     
     # URL for saving meal from calendar modal
     path('ajax/save_meal/', views.ajax_save_meal, name='ajax_save_meal'),
+    path('ajax/delete_meal/', views.ajax_delete_meal, name='ajax_delete_meal'),
 ]

@@ -219,21 +219,43 @@ class DayDetailView(LoginRequiredMixin, TemplateView):
         
         # Détermine le type de repas à partir du bouton cliqué
         meal_type = None
+        action = None
+
         for key in request.POST:
             if key.startswith('save_'):
                 meal_type = key.replace('save_', '')
+                action = 'save'
+                break
+            elif key.startswith('delete_'):
+                meal_type = key.replace('delete_', '')
+                action = 'delete'
                 break
         
-        if meal_type:
+        if meal_type and action:
             try:
-                meal = Meal.objects.get(date=current_date, meal_type=meal_type)
+                meal_instance = Meal.objects.get(date=current_date, meal_type=meal_type)
+                
+                if action == 'delete':
+                    meal_instance.delete()
+                    # Optionally, add a Django message here: messages.success(request, 'Repas supprimé avec succès.')
+                    return redirect('meal_planner:day_detail', year=year, month=month, day=day)
+                
+                # If action is 'save' (or falls through if not delete)
+                form = MealForm(request.POST, instance=meal_instance, prefix=meal_type)
             except Meal.DoesNotExist:
-                meal = Meal(date=current_date, meal_type=meal_type)
+                # This block should ideally only be hit for 'save' action if meal doesn't exist yet
+                if action == 'delete': # Should not happen if delete button only shows for existing meals
+                    # Optionally, add a Django message here: messages.error(request, 'Repas non trouvé pour la suppression.')
+                    return redirect('meal_planner:day_detail', year=year, month=month, day=day)
+                
+                meal_instance = Meal(date=current_date, meal_type=meal_type) # For saving a new meal
+                form = MealForm(request.POST, instance=meal_instance, prefix=meal_type)
             
-            form = MealForm(request.POST, instance=meal, prefix=meal_type)
-            
-            if form.is_valid():
+            if action == 'save' and form.is_valid():
                 form.save()
+                # Optionally, add a Django message here: messages.success(request, 'Repas enregistré.')
+            # else if action == 'save' and form is not valid, the errors will be in the form
+            # and the page will be re-rendered with these errors by falling through to the redirect.
         
         return redirect('meal_planner:day_detail', year=year, month=month, day=day)
 
@@ -618,3 +640,41 @@ def ajax_save_meal(request):
     
     # If not POST, or if other conditions lead here (which they shouldn't with proper structure)
     return JsonResponse({'status': 'error', 'message': f'Invalid request method: {request.method}. Only POST is allowed.'}, status=405)
+
+@login_required
+def ajax_delete_meal(request):
+    if request.method == 'POST':
+        meal_id = request.POST.get('meal_id')
+        if not meal_id:
+            return JsonResponse({'status': 'error', 'message': 'Meal ID manquant.'}, status=400)
+        
+        try:
+            meal = get_object_or_404(Meal, pk=meal_id)
+            # Optional: Check if the user has permission to delete this meal
+            # For example, if you have a 'created_by' field on the Meal model:
+            # if meal.created_by != request.user and not request.user.is_staff:
+            #     return JsonResponse({'status': 'error', 'message': 'Permission refusée.'}, status=403)
+            
+            # Store details needed for UI update before deleting
+            meal_date_iso = meal.date.isoformat()
+            meal_type_value = meal.meal_type
+            meal_type_display_text = meal.get_meal_type_display()
+
+            meal.delete()
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Repas supprimé avec succès.',
+                'deleted_meal_info': { # Sending back info to help UI update
+                    'date': meal_date_iso,
+                    'meal_type': meal_type_value,
+                    'meal_type_display': meal_type_display_text
+                }
+            })
+        except Meal.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Repas non trouvé.'}, status=404)
+        except Exception as e:
+            # Log the exception e for server-side debugging
+            print(f"Error deleting meal: {e}")
+            return JsonResponse({'status': 'error', 'message': 'Une erreur est survenue lors de la suppression.'}, status=500)
+    return JsonResponse({'status': 'error', 'message': 'Méthode non autorisée.'}, status=405)

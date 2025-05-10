@@ -67,7 +67,7 @@
                 </button>
                 
                 {% if meal_data.exists %}
-                <a href="#" class="btn btn-danger">Supprimer</a>
+                <button type="submit" name="delete_{{ meal_type }}" class="btn btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce repas ?');">Supprimer</button>
                 {% endif %}
             </div>
         </form>
