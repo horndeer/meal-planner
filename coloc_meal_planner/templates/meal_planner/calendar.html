@@ -10,8 +10,9 @@
     </div>
     <div class="col-md-6 text-md-end">
         <div class="btn-group" role="group">
-            <a href="?{{ prev_month }}" class="btn btn-outline-primary">&laquo; Mois précédent</a>
-            <a href="?{{ next_month }}" class="btn btn-outline-primary">Mois suivant &raquo;</a>
+            <a href="/?{{ prev_week }}" class="btn btn-outline-primary">&laquo; Semaine précédente</a>
+            <a href="/" class="btn btn-outline-secondary">Semaine actuelle</a>
+            <a href="/?{{ next_week }}" class="btn btn-outline-primary">Semaine suivante &raquo;</a>
         </div>
     </div>
 </div>
@@ -27,39 +28,249 @@
 
 <div class="row">
     <div class="col-md-12">
-        <div class="d-flex mb-4">
+        <div class="d-flex mb-4 meal-legend">
             <span class="me-3"><span class="badge bg-warning">&nbsp;</span> Petit-déjeuner</span>
             <span class="me-3"><span class="badge bg-success">&nbsp;</span> Déjeuner</span>
             <span><span class="badge bg-info">&nbsp;</span> Dîner</span>
         </div>
     </div>
 </div>
+
+<!-- Meal Modal -->
+<div class="modal fade" id="mealModal" tabindex="-1" aria-labelledby="mealModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mealModalLabel">Planifier un repas</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="mealModalForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="mealId" name="meal_id">
+                    <input type="hidden" id="mealDate" name="date">
+                    <input type="hidden" id="formMealType" name="meal_type">
+
+                    <div class="mb-3">
+                        <label for="mealRecipe" class="form-label">Recette</label>
+                        <select class="form-select" id="mealRecipe" name="recipe" required>
+                            <option value="">---- Choisir une recette ----</option>
+                            {% for recipe in all_recipes %}
+                                <option value="{{ recipe.pk }}">{{ recipe.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="mealServings" class="form-label">Nombre de personnes</label>
+                        <input type="number" class="form-control" id="mealServings" name="servings" min="1" value="4" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="mealCook" class="form-label">Qui cuisine ?</label>
+                        <select class="form-select" id="mealCook" name="cook">
+                            <option value="">---- Personne ----</option>
+                            {% for user in all_users %}
+                                <option value="{{ user.pk }}">{{ user.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="mealCleaner" class="form-label">Qui fait la vaisselle ?</label>
+                        <select class="form-select" id="mealCleaner" name="cleaner">
+                            <option value="">---- Personne ----</option>
+                            {% for user in all_users %}
+                                <option value="{{ user.pk }}">{{ user.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-primary" id="saveMealButton">Enregistrer</button>
+                <button type="button" class="btn btn-danger" id="deleteMealButton" style="display: none;">Supprimer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Rediriger vers la page du jour quand on clique sur une cellule
-    document.querySelectorAll('td.day').forEach(function(cell) {
-        cell.addEventListener('click', function(e) {
-            // Ne rediriger que si on clique sur la cellule (pas sur un repas existant)
-            if (e.target === cell || e.target.classList.contains('date')) {
-                const day = cell.querySelector('.date').textContent;
-                const currentMonth = '{{ current_month }}'.split(' ');
-                
-                // Obtenir le mois en numérique
-                const months = {
-                    'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6,
-                    'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12,
-                    'Janvier': 1, 'Février': 2, 'Mars': 3, 'Avril': 4, 'Mai': 5, 'Juin': 6,
-                    'Juillet': 7, 'Août': 8, 'Septembre': 9, 'Octobre': 10, 'Novembre': 11, 'Décembre': 12
-                };
-                
-                const month = months[currentMonth[0]] || 1;
-                const year = currentMonth[1] || new Date().getFullYear();
-                
-                window.location.href = `/day/${year}/${month}/${day}/`;
-            }
+    document.addEventListener('DOMContentLoaded', function() {
+        // Redirection existante pour le clic sur la cellule du jour
+        document.querySelectorAll('td.day').forEach(function(cell) {
+            cell.addEventListener('click', function(e) {
+                if (e.target === cell || e.target.classList.contains('date')) {
+                    const dayText = cell.querySelector('.date').textContent;
+                    // Tentative de récupérer l'année et le mois à partir du titre de la semaine
+                    // Cela suppose que `current_month` est formaté comme "Semaine du DD/MM/YYYY au DD/MM/YYYY"
+                    const weekTitle = "{{ current_month }}"; 
+                    const dateMatch = weekTitle.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+
+                    if (dateMatch) {
+                        const [_, weekStartDay, weekStartMonth, weekStartYear] = dateMatch;
+                        const startOfWeekDate = new Date(parseInt(weekStartYear), parseInt(weekStartMonth) - 1, parseInt(weekStartDay));
+                        
+                        // Trouver l'index de la cellule cliquée pour calculer l'offset
+                        const dayCells = Array.from(cell.parentNode.children);
+                        const dayOffset = dayCells.indexOf(cell);
+                        
+                        if (dayOffset !== -1) {
+                            const targetDate = new Date(startOfWeekDate);
+                            targetDate.setDate(startOfWeekDate.getDate() + dayOffset);
+                            window.location.href = `/day/${targetDate.getFullYear()}/${targetDate.getMonth() + 1}/${targetDate.getDate()}/`;
+                        }
+                    } else {
+                        console.error("Could not parse date from week title: ", weekTitle);
+                    }
+                }
+            });
         });
+
+        // Logique pour le modal de repas
+        const mealModalElement = document.getElementById('mealModal');
+        if (mealModalElement) {
+            const mealModal = new bootstrap.Modal(mealModalElement);
+            const mealModalForm = document.getElementById('mealModalForm');
+            const mealModalLabel = document.getElementById('mealModalLabel');
+
+            const mealIdInput = document.getElementById('mealId');
+            const mealDateInput = document.getElementById('mealDate');
+            const formMealTypeInput = document.getElementById('formMealType');
+
+            const recipeSelect = document.getElementById('mealRecipe');
+            const servingsInput = document.getElementById('mealServings');
+            const cookSelect = document.getElementById('mealCook');
+            const cleanerSelect = document.getElementById('mealCleaner');
+            const deleteMealButton = document.getElementById('deleteMealButton');
+
+            document.querySelectorAll('.meal-card-trigger').forEach(function(card) {
+                card.addEventListener('click', function(event) {
+                    event.stopPropagation(); // Empêche le clic de se propager à la cellule td
+
+                    const date = card.dataset.date;
+                    const mealType = card.dataset.mealType;
+                    const mealTypeDisplay = card.dataset.mealTypeDisplay;
+                    const mealId = card.dataset.mealId;
+                    const recipeId = card.dataset.recipeId;
+                    const servings = card.dataset.servings;
+                    const cookId = card.dataset.cookId;
+                    const cleanerId = card.dataset.cleanerId;
+                    const mealExists = card.dataset.mealExists === 'true';
+
+                    mealDateInput.value = date;
+                    formMealTypeInput.value = mealType;
+                    mealIdInput.value = mealId;
+
+                    recipeSelect.value = recipeId || "";
+                    servingsInput.value = servings || "4"; // Default to 4 if not specified
+                    cookSelect.value = cookId || "";
+                    cleanerSelect.value = cleanerId || "";
+
+                    let formattedDate = '';
+                    try {
+                        // Assurer que la date est traitée comme locale, pas UTC pour la conversion
+                        const [year, month, day] = date.split('-');
+                        formattedDate = new Date(year, month - 1, day).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+                    } catch (e) {
+                        console.error('Error formatting date:', date, e);
+                        formattedDate = date; // fallback to ISO date
+                    }
+
+                    if (mealExists) {
+                        mealModalLabel.textContent = `Modifier ${mealTypeDisplay} du ${formattedDate}`;
+                        deleteMealButton.style.display = 'inline-block';
+                    } else {
+                        mealModalLabel.textContent = `Ajouter ${mealTypeDisplay} pour le ${formattedDate}`;
+                        deleteMealButton.style.display = 'none';
+                    }
+                    
+                    mealModal.show();
+                });
+            });
+
+            const saveMealButton = document.getElementById('saveMealButton');
+            if (saveMealButton) {
+                saveMealButton.addEventListener('click', function() {
+                    const formData = new FormData(mealModalForm);
+                    const mealDate = formData.get('date'); // Already in YYYY-MM-DD from hidden input
+                    const mealType = formData.get('meal_type');
+
+                    // Clear previous errors
+                    document.querySelectorAll('.form-error-message').forEach(el => el.remove());
+
+                    fetch("{% url 'meal_planner:ajax_save_meal' %}", {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRFToken': formData.get('csrfmiddlewaretoken') // FormData includes CSRF token
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            mealModal.hide();
+                            // Update the UI on the calendar
+                            // Find the specific meal card to update
+                            // The card is uniquely identified by data-date and data-meal-type
+                            const targetCard = document.querySelector(
+                                `.meal-card-trigger[data-date='${data.date}'][data-meal-type='${data.meal_type}']`
+                            );
+                            if (targetCard) {
+                                targetCard.classList.remove('meal-empty');
+                                targetCard.classList.add(data.meal_type); // Ensure main meal type class is present
+                                
+                                let cardContent = `<strong>${data.meal_type_display}</strong><br>`;
+                                cardContent += `${data.recipe_name}<br>`;
+                                cardContent += `<small>${data.servings} pers.</small>`;
+                                targetCard.innerHTML = cardContent;
+
+                                // Update data attributes on the card for future edits
+                                targetCard.dataset.mealId = data.meal_id;
+                                targetCard.dataset.recipeId = data.recipe_id;
+                                targetCard.dataset.servings = data.servings;
+                                targetCard.dataset.cookId = data.cook_id;
+                                targetCard.dataset.cleanerId = data.cleaner_id;
+                                targetCard.dataset.mealExists = 'true';
+                            } else {
+                                console.error('Could not find target card to update', data.date, data.meal_type);
+                                // Potentially refresh the page or show a generic success message
+                                alert('Repas enregistré avec succès! La page va se rafraichir pour afficher les changements.');
+                                window.location.reload(); 
+                            }
+                            // Optionally, show a more sophisticated success message (e.g., a toast)
+                        } else if (data.status === 'error' && data.errors) {
+                            const errors = JSON.parse(data.errors); // errors are JSON string
+                            for (const field in errors) {
+                                const errorList = errors[field];
+                                const fieldElement = mealModalForm.querySelector(`[name="${field}"]`);
+                                if (fieldElement) {
+                                    const errorDiv = document.createElement('div');
+                                    errorDiv.classList.add('text-danger', 'form-error-message', 'mt-1', 'fs-sm');
+                                    errorDiv.innerHTML = errorList.map(e => e.message).join('<br>');
+                                    fieldElement.parentNode.insertBefore(errorDiv, fieldElement.nextSibling);
+                                }
+                            }
+                            if (data.message) { // For general non-field errors from the view
+                                alert('Erreur: ' + data.message);
+                            }
+                        } else {
+                            alert('Une erreur inconnue est survenue.');
+                            console.error('Unknown error:', data);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error during fetch:', error);
+                        alert('Erreur de communication avec le serveur.');
+                    });
+                });
+            }
+
+            // TODO: AJAX for deleteMealButton click
+        } else {
+            console.error('Meal modal element not found');
+        }
     });
 </script>
 {% endblock %}

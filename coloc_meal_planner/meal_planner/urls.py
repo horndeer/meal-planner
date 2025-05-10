@@ -28,4 +28,7 @@ urlpatterns = [
     path('shopping-lists/<int:pk>/', views.ShoppingListDetailView.as_view(), name='shopping_list_detail'),
     path('shopping-items/<int:pk>/toggle/', views.toggle_shopping_item, name='toggle_shopping_item'),
     path('api/ingredients/', views.ingredients_api, name='ingredients_api'),
+    
+    # URL for saving meal from calendar modal
+    path('ajax/save_meal/', views.ajax_save_meal, name='ajax_save_meal'),
 ]

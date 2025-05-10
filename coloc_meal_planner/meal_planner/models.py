@@ -45,7 +45,7 @@ class RecipeIngredient(models.Model):
 
 class Meal(models.Model):
     MEAL_TYPES = [
-        ('breakfast', 'Petit-déjeuner'),
+        # ('breakfast', 'Petit-déjeuner'),
         ('lunch', 'Déjeuner'),
         ('dinner', 'Dîner'),
     ]

@@ -1,12 +1,12 @@
 <!-- templates/meal_planner/day_detail.html -->
 {% extends 'meal_planner/base.html' %}
 
-{% block title %}Repas du {{ date|date:"d/m/Y" }} | {{ block.super }}{% endblock %}
+{% block title %}Repas du {{ date|date:"l j F" }} | {{ block.super }}{% endblock %}
 
 {% block content %}
 <div class="row mb-3">
     <div class="col-md-6">
-        <h1>Repas du {{ date|date:"d/m/Y" }}</h1>
+        <h1>Repas du {{ date|date:"l j F" }}</h1>
     </div>
     <div class="col-md-6 text-md-end">
         <div class="btn-group" role="group">
@@ -26,6 +26,11 @@
         <form method="post">
             {% csrf_token %}
             {{ meal_data.form.non_field_errors }}
+            
+            {# Champs cachés pour le préfixe #}
+            {% for hidden_field in meal_data.form.hidden_fields %}
+                {{ hidden_field }}
+            {% endfor %}
             
             <div class="row mb-3">
                 <div class="col-md-6">
@@ -52,6 +57,9 @@
                     {{ meal_data.form.cleaner.errors }}
                 </div>
             </div>
+            
+            {# Champ caché pour le type de repas #}
+            <input type="hidden" name="{{ meal_data.form.meal_type.html_name }}" value="{{ meal_type }}">
             
             <div class="d-flex justify-content-between">
                 <button type="submit" name="save_{{ meal_type }}" class="btn btn-primary">

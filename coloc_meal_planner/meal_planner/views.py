@@ -9,6 +9,7 @@ from django.utils.safestring import mark_safe
 from django.db.models import Sum
 from django.views.decorators.csrf import csrf_exempt
 from django.core.serializers import serialize
+from django.utils import timezone
 
 import calendar
 from datetime import datetime, timedelta, date
@@ -16,7 +17,7 @@ from calendar import HTMLCalendar
 from dateutil.relativedelta import relativedelta
 import json
 
-from .models import Recipe, Ingredient, RecipeIngredient, Meal, ShoppingList, ShoppingListItem
+from .models import Recipe, Ingredient, RecipeIngredient, Meal, ShoppingList, ShoppingListItem, User
 from .forms import RecipeForm, RecipeIngredientFormSet, MealForm, ShoppingListForm, MarmitonImportForm
 from .scraper import scrape_marmiton_recipe
 
@@ -26,18 +27,38 @@ class CalendarView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Récupérer la date actuelle ou celle spécifiée dans l'URL
-        d = get_date(self.request.GET.get('month', None))
-        cal = MealCalendar(d.year, d.month)
+        week = self.request.GET.get('week', None)
+        if week:
+            try:
+                d = datetime.strptime(week, '%Y-%m-%d').date()
+            except ValueError:
+                d = datetime.today().date()
+        else:
+            d = datetime.today().date()
         
-        # Récupérer tous les repas du mois
-        meals = Meal.objects.filter(date__year=d.year, date__month=d.month)
-        html_calendar = cal.formatmonth(meals, withyear=True)
+        start_of_week = d - timedelta(days=d.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        
+        cal = MealCalendar(start_of_week.year, start_of_week.month) 
+        
+        meals = Meal.objects.filter(
+            date__gte=start_of_week,
+            date__lte=end_of_week
+        ).select_related('recipe', 'cook', 'cleaner')
+        
+        html_calendar = cal.formatweek(meals, start_of_week)
+        
+        prev_week = start_of_week - timedelta(days=7)
+        next_week = start_of_week + timedelta(days=7)
         
         context['calendar'] = mark_safe(html_calendar)
-        context['prev_month'] = prev_month(d)
-        context['next_month'] = next_month(d)
-        context['current_month'] = d.strftime("%B %Y")
+        context['prev_week'] = f'week={prev_week.strftime("%Y-%m-%d")}'
+        context['next_week'] = f'week={next_week.strftime("%Y-%m-%d")}'
+        context['current_month'] = f"Semaine du {start_of_week.strftime('%d/%m/%Y')} au {end_of_week.strftime('%d/%m/%Y')}"
+        
+        context['meal_form'] = MealForm()
+        context['all_recipes'] = Recipe.objects.all().order_by('name')
+        context['all_users'] = User.objects.all().order_by('username')
         
         return context
 
@@ -50,17 +71,14 @@ def get_date(req_day):
 
 
 def prev_month(d):
-    first = d.replace(day=1)
-    prev_month = first - timedelta(days=1)
-    month = 'month=' + prev_month.strftime("%Y-%m")
+    prev_week = d - timedelta(days=7)
+    month = 'month=' + prev_week.strftime("%Y-%m")
     return month
 
 
 def next_month(d):
-    days_in_month = calendar.monthrange(d.year, d.month)[1]
-    last = d.replace(day=days_in_month)
-    next_month = last + timedelta(days=1)
-    month = 'month=' + next_month.strftime("%Y-%m")
+    next_week = d + timedelta(days=7)
+    month = 'month=' + next_week.strftime("%Y-%m")
     return month
 
 
@@ -70,35 +88,85 @@ class MealCalendar(HTMLCalendar):
         self.month = month
         super(MealCalendar, self).__init__()
     
-    def formatday(self, day, weekday, meals):
-        """Return a day as a table cell."""
-        day_meals = meals.filter(date__day=day)
+    def formatday(self, day_number, weekday, meals_for_week, current_day_date):
+        """Return a day as a table cell.
+        day_number: the day of the month (1-31)
+        weekday: Monday is 0 and Sunday is 6
+        meals_for_week: QuerySet of all meals for the displayed week
+        current_day_date: the actual date object for this day cell
+        """
+        if day_number == 0:
+            return "<td class='noday'>&nbsp;</td>"
+            
+        current_date = current_day_date
+        
         meals_html = ""
         
-        for meal in day_meals:
-            meals_html += f"<div class='meal {meal.meal_type}'>"
-            meals_html += f"{meal.get_meal_type_display()}: {meal.recipe.name} ({meal.servings} pers.)"
-            meals_html += "</div>"
+        today = date.today()
+        is_today = (current_date == today)
         
-        if day != 0:
-            return f"<td class='day'><span class='date'>{day}</span>{meals_html}</td>"
-        return "<td class='noday'>&nbsp;</td>"
+        day_class = 'day' + (' today' if is_today else '')
+        
+        for meal_type_value, meal_type_display in Meal.MEAL_TYPES:
+            meal = meals_for_week.filter(date=current_date, meal_type=meal_type_value).first()
+            
+            meal_id = meal.id if meal else ''
+            recipe_id = meal.recipe.id if meal and meal.recipe else ''
+            servings = meal.servings if meal else 4
+            cook_id = meal.cook.id if meal and meal.cook else ''
+            cleaner_id = meal.cleaner.id if meal and meal.cleaner else ''
+            meal_exists = 'true' if meal else 'false'
+
+            data_attrs = (
+                f'data-date="{current_date.isoformat()}" '
+                f'data-meal-type="{meal_type_value}" '
+                f'data-meal-type-display="{meal_type_display}" '
+                f'data-meal-id="{meal_id}" '
+                f'data-recipe-id="{recipe_id}" '
+                f'data-servings="{servings}" '
+                f'data-cook-id="{cook_id}" '
+                f'data-cleaner-id="{cleaner_id}" '
+                f'data-meal-exists="{meal_exists}"'
+            )
+            
+            if meal:
+                meals_html += f"<div class='meal meal-card-trigger {meal.meal_type}' {data_attrs}>"
+                meals_html += f"<strong>{meal.get_meal_type_display()}</strong><br>"
+                meals_html += f"{meal.recipe.name}<br>"
+                meals_html += f"<small>{meal.servings} pers.</small>"
+                meals_html += "</div>"
+            else:
+                meals_html += f"<div class='meal meal-card-trigger meal-empty {meal_type_value}' {data_attrs}>"
+                meals_html += f"<strong>{meal_type_display}</strong><br>"
+                meals_html += f"<small>Ajouter un repas</small>"
+                meals_html += "</div>"
+        
+        return f"<td class='{day_class}'><span class='date'>{current_date.day}</span>{meals_html}</td>"
     
-    def formatweek(self, theweek, meals):
-        """Return a complete week as a table row."""
-        week = ''
-        for d, weekday in theweek:
-            week += self.formatday(d, weekday, meals)
-        return f'<tr> {week} </tr>'
-    
-    def formatmonth(self, meals, withyear=True):
-        """Return a formatted month as a table."""
-        cal = f'<table border="0" cellpadding="0" cellspacing="0" class="calendar">\n'
-        cal += f'{self.formatmonthname(self.year, self.month, withyear=withyear)}\n'
-        cal += f'{self.formatweekheader()}\n'
-        for week in self.monthdays2calendar(self.year, self.month):
-            cal += f'{self.formatweek(week, meals)}\n'
+    def formatweek(self, meals_for_week, start_of_week_date):
+        """Return a complete week as a table.
+        start_of_week_date: date object for the Monday of the week.
+        """
+        cal = '<table border="0" cellpadding="0" cellspacing="0" class="calendar">\n'
+        cal += self.formatweekheader() + '\n'
+        
+        week_html = ''
+        for i in range(7):
+            current_day_date = start_of_week_date + timedelta(days=i)
+            week_html += self.formatday(current_day_date.day, current_day_date.weekday(), meals_for_week, current_day_date)
+        
+        cal += f'<tr>{week_html}</tr>\n'
         return cal + '</table>'
+    
+    def formatweekheader(self):
+        """Return a header for a week as a table row."""
+        s = ''.join(self.formatweekday(i) for i in self.iterweekdays())
+        return '<tr class="weekday">' + s + '</tr>'
+    
+    def formatweekday(self, day):
+        """Return a weekday name as a table header."""
+        days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+        return f'<th class="{self.cssclasses_weekday_head[day]}">{days[day]}</th>'
 
 
 class DayDetailView(LoginRequiredMixin, TemplateView):
@@ -140,6 +208,9 @@ class DayDetailView(LoginRequiredMixin, TemplateView):
         return context
     
     def post(self, request, *args, **kwargs):
+        print("request.POST")
+        print(request.POST)
+        print(kwargs)
         year = self.kwargs.get('year')
         month = self.kwargs.get('month')
         day = self.kwargs.get('day')
@@ -493,3 +564,57 @@ def ingredients_api(request):
         return JsonResponse(results, safe=False)
     
     return JsonResponse([], safe=False)
+
+@login_required
+def ajax_save_meal(request):
+    print(f"ajax_save_meal called with method: {request.method}") # Debug print
+    if request.method == 'POST':
+        form_data = request.POST.copy()
+        meal_id = form_data.get('meal_id')
+        
+        if meal_id:
+            try:
+                meal_instance = Meal.objects.get(pk=meal_id) 
+                form = MealForm(form_data, instance=meal_instance)
+            except Meal.DoesNotExist:
+                return JsonResponse({'status': 'error', 'message': 'Repas non trouvé.'}, status=404)
+        else:
+            form = MealForm(form_data)
+        
+        if form.is_valid():
+            meal = form.save(commit=False)
+            if not meal_id: # Only set date for new meals, for existing it's already on meal_instance
+                date_str = form_data.get('date')
+                if date_str:
+                    try:
+                        meal.date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        form.add_error(None, 'Format de date invalide.') # Add to non-field errors
+                        return JsonResponse({'status': 'error', 'errors': form.errors.as_json()}, status=400)
+                else:
+                    form.add_error(None, 'La date est requise.') # Add to non-field errors
+                    return JsonResponse({'status': 'error', 'errors': form.errors.as_json()}, status=400)
+            
+            meal.save()
+            
+            response_data = {
+                'status': 'success',
+                'meal_id': meal.id,
+                'recipe_id': meal.recipe.id if meal.recipe else '',
+                'recipe_name': meal.recipe.name if meal.recipe else 'Non spécifié',
+                'servings': meal.servings,
+                'cook_id': meal.cook.id if meal.cook else '',
+                'cook_name': meal.cook.username if meal.cook else 'Non spécifié',
+                'cleaner_id': meal.cleaner.id if meal.cleaner else '',
+                'cleaner_name': meal.cleaner.username if meal.cleaner else 'Non spécifié',
+                'meal_type': meal.meal_type,
+                'meal_type_display': meal.get_meal_type_display(),
+                'date': meal.date.isoformat()
+            }
+            return JsonResponse(response_data)
+        else:
+            # This is for form validation errors
+            return JsonResponse({'status': 'error', 'errors': form.errors.as_json()}, status=400)
+    
+    # If not POST, or if other conditions lead here (which they shouldn't with proper structure)
+    return JsonResponse({'status': 'error', 'message': f'Invalid request method: {request.method}. Only POST is allowed.'}, status=405)

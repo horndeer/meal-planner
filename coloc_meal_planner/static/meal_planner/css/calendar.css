@@ -1,4 +1,3 @@
-
 /* .calendar {
     width: 100%;
     margin-bottom: 20px;
@@ -56,16 +55,18 @@
 }
 
 .calendar th {
-    padding: 10px;
+    padding: 15px;
     text-align: center;
     background-color: #f8f9fa;
     border: 1px solid #dee2e6;
     width: 14.28%; /* 100% / 7 days */
+    font-weight: 600;
+    color: #495057;
 }
 
 .calendar td {
-    padding: 10px;
-    height: 120px;
+    padding: 15px;
+    height: 180px; /* Augmenté pour plus d'espace */
     vertical-align: top;
     border: 1px solid #dee2e6;
     width: 14.28%; /* 100% / 7 days */
@@ -77,6 +78,22 @@
     position: relative;
 }
 
+/* Style pour le jour actuel
+.calendar td.day.today {
+    background-color: #9eabb7 !important;
+    border: 2px solid #6c757d !important;
+} */
+
+.calendar td.day.today .date {
+    background-color: #e9ecef !important;
+    color: black !important;
+}
+
+/* .calendar td.day.today {
+    background-color: #e9ecef;
+    border: 2px solid #6c757d;
+} */
+
 .calendar td.day:hover {
     background-color: #e9ecef;
 }
@@ -84,44 +101,114 @@
 .calendar td.noday {
     background-color: #f8f9fa;
 }
-
 .calendar .date {
     font-weight: bold;
-    margin-bottom: 5px;
+    margin-bottom: 10px;
     display: block;
-    font-size: 1.1em;
+    font-size: 1.2em;
+    color: #212529;
+    padding: 5px;
+    border-radius: 4px;
+    /* background-color: #f8f9fa; */
 }
+
 
 .calendar .meal {
     font-size: 0.9em;
-    margin-bottom: 3px;
-    padding: 2px 4px;
-    border-radius: 3px;
+    margin-bottom: 8px;
+    padding: 8px;
+    border-radius: 6px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease;
+}
+
+.calendar .meal:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
 }
 
 .calendar .meal.breakfast {
     background-color: #ffc107;
     color: #000;
+    border-left: 4px solid #ffa000;
 }
 
 .calendar .meal.lunch {
     background-color: #28a745;
     color: #fff;
+    border-left: 4px solid #1e7e34;
 }
 
 .calendar .meal.dinner {
     background-color: #17a2b8;
     color: #fff;
+    border-left: 4px solid #117a8b;
+}
+
+.calendar .meal.meal-empty {
+    background-color: #ffffff;
+    color: #495057; /* Dark grey text */
+    border: 1px dashed #ced4da; /* Light grey dashed border */
+    box-shadow: none; /* No shadow for empty meals */
+}
+
+.calendar .meal.meal-empty:hover {
+    transform: none; /* No hover effect for empty meals */
+    box-shadow: none;
+    background-color: #f8f9fa; /* Slight hover effect */
+}
+
+/* Specific styling for empty lunch/dinner to maintain some visual cues if needed */
+.calendar .meal.meal-empty.lunch {
+    border-left: 4px dashed #b8dbba; /* Lighter green border */
+}
+
+.calendar .meal.meal-empty.dinner {
+    border-left: 4px dashed #b3d7db; /* Lighter blue border */
 }
 
 /* Ensure the calendar table takes full width */
 .card-body {
     padding: 0;
+    overflow-x: auto;
 }
 
 .card-body .calendar {
     margin: 0;
+    min-width: 800px; /* Assure une largeur minimale pour éviter la compression */
+}
+
+/* Légende des repas */
+.meal-legend {
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.meal-legend .badge {
+    width: 20px;
+    height: 20px;
+    margin-right: 5px;
+    border-radius: 4px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .calendar td {
+        height: 150px;
+        padding: 10px;
+    }
+    
+    .calendar .meal {
+        font-size: 0.8em;
+        padding: 6px;
+    }
+    
+    .calendar .date {
+        font-size: 1em;
+    }
 }  
