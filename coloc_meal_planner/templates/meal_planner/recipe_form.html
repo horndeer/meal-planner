@@ -3,6 +3,8 @@
 
 {% block extra_css %}
 {{ form.media.css }}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 {% endblock %}
 
 {% block content %}
@@ -34,37 +36,46 @@
                 <h3 class="card-title">Ingrédients</h3>
                 {{ ingredients_formset.management_form }}
                 <div id="ingredients-formset">
+
+
+                    
                     {% for form in ingredients_formset %}
-                    <div class="ingredient-form mb-3 p-3 border rounded">
+                    <div class="ingredient-form p-3">
                         <div class="row">
                             <div class="col-md-5">
                                 <div class="mb-2">
+                                    {% if forloop.first %}
                                     <label class="form-label">Ingrédient</label>
+                                    {% endif %}
                                     {{ form.ingredient}}
-                                    {% comment %} {{ form.id }} {% endcomment %}
+                                    {{ form.id }}
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-2">
+                                    {% if forloop.first %}
                                     <label class="form-label">Quantité</label>
+                                    {% endif %}
                                     {{ form.quantity }}
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="mb-2">
+                                    {% if forloop.first %}
                                     <label class="form-label">Unité</label>
+                                    {% endif %}
                                     {{ form.unit }}
                                 </div>
                             </div>
                         </div>
-                        {% if form.instance.pk %}
+                        {% comment %} {% if form.instance.pk %}
                         <div class="form-check mt-2">
                             {{ form.DELETE }}
                             <label class="form-check-label" for="{{ form.DELETE.id_for_label }}">
                                 Supprimer cet ingrédient
                             </label>
                         </div>
-                        {% endif %}
+                        {% endif %} {% endcomment %}
                     </div>
                     {% endfor %}
                 </div>
@@ -83,6 +94,8 @@
 
 {% block extra_js %}
 {{ form.media.js }}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const addButton = document.getElementById('add-ingredient');
@@ -90,22 +103,83 @@ document.addEventListener('DOMContentLoaded', function() {
     const formsetContainer = document.getElementById('ingredients-formset');
     const emptyForm = document.querySelector('.ingredient-form').cloneNode(true);
     
-    // Fonction pour créer un nouveau formulaire
+    // Configure Select2 options once
+    const select2Options = {
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: 'Rechercher un ingrédient...',
+        allowClear: true,
+        minimumInputLength: 1,
+        tags: true, // Allow creating new tags/ingredients
+        createTag: function(params) {
+            return {
+                id: 'new:' + params.term,
+                text: params.term,
+                newTag: true
+            }
+        },
+        ajax: {
+            url: '{% url "meal_planner:ingredients_api" %}',
+            dataType: 'json',
+            delay: 250,
+            data: function(params) {
+                return {
+                    q: params.term
+                };
+            },
+            processResults: function(data) {
+                return {
+                    results: data.map(function(item) {
+                        return {
+                            id: item.id || item.pk,
+                            text: item.name
+                        };
+                    })
+                };
+            },
+            cache: true
+        },
+        templateResult: function(data) {
+            if (data.loading) return data.text;
+            if (data.newTag) {
+                return $('<span><i class="fas fa-plus-circle me-1"></i>Créer "' + data.text + '"</span>');
+            }
+            return $('<span>' + data.text + '</span>');
+        },
+        templateSelection: function(data) {
+            return data.text;
+        }
+    };
+    
+    // Initialize Select2 on all ingredient selects
+    $('[id$="-ingredient"]').each(function() {
+        $(this).select2(select2Options);
+    });
+    
+    // Function to create a new form
     function createNewForm() {
         const formCount = parseInt(totalForms.value);
         const newForm = emptyForm.cloneNode(true);
         
-        // Mettre à jour les IDs et names des champs
+        // Update IDs and names of fields
         newForm.querySelectorAll('input, select').forEach(input => {
             const name = input.getAttribute('name');
             if (name) {
-                input.setAttribute('name', name.replace('-0-', `-${formCount}-`));
-                input.setAttribute('id', input.getAttribute('id').replace('-0-', `-${formCount}-`));
-                input.value = '';
+                // Replace the form index in the name and id
+                const newName = name.replace('-0-', `-${formCount}-`);
+                const newId = input.getAttribute('id').replace('-0-', `-${formCount}-`);
+                
+                input.setAttribute('name', newName);
+                input.setAttribute('id', newId);
+                
+                // Clear the value, but keep the ID field if it exists
+                if (!input.getAttribute('name').includes('-id')) {
+                    input.value = '';
+                }
             }
         });
         
-        // Supprimer la case à cocher DELETE si elle existe
+        // Remove DELETE checkbox if it exists
         const deleteCheckbox = newForm.querySelector('input[type="checkbox"]');
         if (deleteCheckbox) {
             deleteCheckbox.parentElement.remove();
@@ -114,25 +188,47 @@ document.addEventListener('DOMContentLoaded', function() {
         formsetContainer.appendChild(newForm);
         totalForms.value = formCount + 1;
         
-        // Réinitialiser Select2 sur le nouveau formulaire
-        const select = newForm.querySelector('select');
-        if (select) {
-            $(select).select2({
-                theme: 'bootstrap-5',
-                width: '100%',
-                tags: true,
-                placeholder: 'Rechercher ou créer un ingrédient...'
-            });
-        }
+        // Initialize Select2 on the new form's ingredient select
+        $(newForm.querySelector('[id$="-ingredient"]')).select2(select2Options);
     }
     
-    // Gestion de l'ajout de nouveaux formulaires
+    // Handle adding new forms
     addButton.addEventListener('click', createNewForm);
     
-    // Si aucun ingrédient n'est présent, en ajouter un par défaut
+    // If no ingredients are present, add one by default
     if (document.querySelectorAll('.ingredient-form').length === 0) {
         createNewForm();
     }
+    
+    // Handle selecting/creating ingredients with keyboard navigation
+    $(document).on('keydown', '.select2-search__field', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const searchField = $(this);
+            const dropdown = searchField.closest('.select2-container').prev('select');
+            const searchTerm = searchField.val().trim();
+            
+            if (searchTerm !== '') {
+                // Check if there's a highlighted option in the dropdown
+                const highlightedOption = $('.select2-results__option--highlighted');
+                
+                if (highlightedOption.length) {
+                    // Select the highlighted option
+                    const optionData = highlightedOption.data();
+                    dropdown.val(optionData.data.id).trigger('change');
+                } else {
+                    // Create a new option
+                    const newOption = new Option(searchTerm, 'new:' + searchTerm, true, true);
+                    dropdown.append(newOption).trigger('change');
+                }
+                
+                // Close the dropdown
+                dropdown.select2('close');
+            }
+        }
+    });
 });
 </script>
 {% endblock %}

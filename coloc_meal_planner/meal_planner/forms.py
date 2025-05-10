@@ -4,7 +4,7 @@ from django.forms import inlineformset_factory
 from .models import Recipe, RecipeIngredient, Meal, ShoppingList, Ingredient
 from django.contrib.auth.models import User
 from django_select2.forms import Select2Widget, Select2TagWidget
-
+from django_select2 import forms as s2forms
 
 class IngredientForm(forms.ModelForm):
     class Meta:
@@ -19,11 +19,11 @@ class IngredientForm(forms.ModelForm):
 class RecipeIngredientForm(forms.ModelForm):
     ingredient = forms.ModelChoiceField(
         queryset=Ingredient.objects.all(),
-        widget=Select2TagWidget(
+        widget=Select2Widget(
             attrs={
-                'data-placeholder': 'Rechercher ou créer un ingrédient...',
-                'data-tags': 'true',
-                'class': 'form-control',
+                'class': 'form-control ingredient-select',
+                'data-placeholder': 'Rechercher un ingrédient...',
+                'data-minimum-input-length': 1,
             }
         ),
         required=True,
@@ -40,8 +40,9 @@ class RecipeIngredientForm(forms.ModelForm):
 
     class Meta:
         model = RecipeIngredient
-        fields = ['ingredient', 'quantity', 'unit']
+        fields = ['id', 'ingredient', 'quantity', 'unit']
         widgets = {
+            'id': forms.HiddenInput(),
             'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
             'unit': forms.TextInput(attrs={'class': 'form-control'}),
         }
@@ -49,24 +50,28 @@ class RecipeIngredientForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk and self.instance.ingredient:
-            self.fields['ingredient'].initial = self.instance.ingredient.name
+            self.fields['ingredient'].initial = self.instance.ingredient
 
     def clean(self):
         cleaned_data = super().clean()
-        ingredient_name = cleaned_data.get('ingredient')
+        ingredient_value = cleaned_data.get('ingredient')
         
-        if not ingredient_name:
-            raise forms.ValidationError("Vous devez sélectionner ou créer un ingrédient.")
-        
-        # Try to get existing ingredient or create new one
-        ingredient, created = Ingredient.objects.get_or_create(
-            name=ingredient_name,
-            defaults={'unit': cleaned_data.get('unit', '')}
-        )
-        
-        # Update the cleaned_data with the actual ingredient instance
-        cleaned_data['ingredient'] = ingredient
+        # Handle 'new:X' values from Select2 tags
+        if isinstance(ingredient_value, str) and ingredient_value.startswith('new:'):
+            new_ingredient_name = ingredient_value.replace('new:', '')
+            # Check if the ingredient already exists
+            try:
+                # Try to get existing ingredient
+                ingredient = Ingredient.objects.get(name__iexact=new_ingredient_name)
+            except Ingredient.DoesNotExist:
+                # Create a new ingredient
+                ingredient = Ingredient.objects.create(
+                    name=new_ingredient_name,
+                    unit=cleaned_data.get('unit', '')
+                )
             
+            cleaned_data['ingredient'] = ingredient
+        
         return cleaned_data
 
 

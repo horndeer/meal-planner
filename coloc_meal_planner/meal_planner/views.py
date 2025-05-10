@@ -201,19 +201,6 @@ class RecipeCreateView(LoginRequiredMixin, CreateView):
         if ingredients_formset.is_valid():
             self.object = form.save()
             ingredients_formset.instance = self.object
-            
-            # Gérer la création des nouveaux ingrédients
-            for form in ingredients_formset.forms:
-                if form.is_valid() and not form.cleaned_data.get('DELETE', False):
-                    ingredient_data = form.cleaned_data.get('ingredient')
-                    if isinstance(ingredient_data, str):
-                        # C'est un nouvel ingrédient
-                        ingredient = Ingredient.objects.create(
-                            name=ingredient_data,
-                            unit=form.cleaned_data.get('unit', '')
-                        )
-                        form.instance.ingredient = ingredient
-            
             ingredients_formset.save()
             return HttpResponseRedirect(self.get_success_url())
         else:
@@ -233,7 +220,40 @@ class RecipeUpdateView(LoginRequiredMixin, UpdateView):
         else:
             context['ingredients_formset'] = RecipeIngredientFormSet(instance=self.object)
         return context
-    
+
+    def handle_new_ingredients(self, formset_data):
+        """Handle new ingredients in the formset data and create them if needed."""
+        # Create a copy of the POST data to modify
+        modified_data = formset_data.copy()
+        
+        # Get the total number of forms
+        total_forms = int(formset_data.get('ingredients-TOTAL_FORMS', 0))
+        
+        # Process each form in the formset
+        for i in range(total_forms):
+            ingredient_key = f'ingredients-{i}-ingredient'
+            ingredient_value = formset_data.get(ingredient_key)
+            
+            # Check if this is a new ingredient (starts with 'new:')
+            if ingredient_value and isinstance(ingredient_value, str) and ingredient_value.startswith('new:'):
+                new_ingredient_name = ingredient_value.replace('new:', '')
+                
+                # Try to get existing ingredient first
+                try:
+                    ingredient = Ingredient.objects.get(name__iexact=new_ingredient_name)
+                except Ingredient.DoesNotExist:
+                    # Create new ingredient
+                    unit = formset_data.get(f'ingredients-{i}-unit', '')
+                    ingredient = Ingredient.objects.create(
+                        name=new_ingredient_name,
+                        unit=unit
+                    )
+                
+                # Update the form data with the new ingredient's ID
+                modified_data[ingredient_key] = str(ingredient.id)
+        
+        return modified_data
+
     def form_valid(self, form):
         context = self.get_context_data()
         ingredients_formset = context['ingredients_formset']
@@ -244,7 +264,21 @@ class RecipeUpdateView(LoginRequiredMixin, UpdateView):
             ingredients_formset.save()
             return HttpResponseRedirect(self.get_success_url())
         else:
-            return self.render_to_response(self.get_context_data(form=form))
+            # Handle new ingredients and try to validate again
+            modified_data = self.handle_new_ingredients(self.request.POST)
+            modified_formset = RecipeIngredientFormSet(modified_data, instance=self.object)
+            
+            if modified_formset.is_valid():
+                self.object = form.save()
+                modified_formset.instance = self.object
+                modified_formset.save()
+                return HttpResponseRedirect(self.get_success_url())
+            else:
+                # If still invalid, return the original form with errors
+                print("ERRORS")
+                print(form.errors)
+                print(modified_formset.errors)
+                return self.render_to_response(self.get_context_data(form=form))
 
 
 @login_required
@@ -450,10 +484,12 @@ def add_to_planning_form(request, recipe_id):
 
 @login_required
 def ingredients_api(request):
-    """API endpoint to get the list of ingredients"""
-    ingredients = Ingredient.objects.all().order_by('name')
-    data = [{
-        'name': ing.name,
-        'unit': ing.unit or ''
-    } for ing in ingredients]
-    return JsonResponse(data, safe=False)
+    """API endpoint for Select2 to search ingredients"""
+    query = request.GET.get('q', '')
+    
+    if query:
+        ingredients = Ingredient.objects.filter(name__icontains=query)
+        results = [{'id': ingredient.id, 'name': ingredient.name} for ingredient in ingredients]
+        return JsonResponse(results, safe=False)
+    
+    return JsonResponse([], safe=False)
