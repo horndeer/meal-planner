@@ -23,9 +23,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-r2oa(v2tv%z)j_2!rqvd!^3=bvrlxx#*ga&uyup!pxuk%t+!3$'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ["*"]
+CSRF_TRUSTED_ORIGINS = ['https://meal-planner-production-4e47.up.railway.app']
 
 LOGIN_URL = '/admin/login/'  # Or any other login URL you want to use
 
