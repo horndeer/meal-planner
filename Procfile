@@ -1,0 +1,1 @@
+web: gunicorn coloc_meal_planner.wsgi --log-file -
